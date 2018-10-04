@@ -1,3 +1,6 @@
 # javascript and selenium junk
 test_files
 debug.log
+
+# could be a lot of data
+data/
