@@ -1,3 +1,5 @@
+import re
+import os
 from datetime import datetime
 
 import requests
@@ -11,12 +13,19 @@ TODAY = now.strftime('%Y%m%d')
 BASE_URL = r'https://auction.screenbid.com/view-auctions/catalog/id/105/'
 AUCTION_URL = r'https://auction.screenbid.com/'
 
+
 def get_no_verify(url):
     session = requests.Session()
     session.verify = False
     html = session.post(url=url).text
 
     return html
+
+def clean_item_names(name):
+    correct_chars = re.compile('[\w\s\d]', re.I)
+    clean_name = ''.join(correct_chars.findall(name))
+    return clean_name
+
 
 def save_raw_page(item_name, html, extra=''):
     file_name = 'data/' + item_name + ' ' + extra + ' ' + TODAY + '.html'
@@ -64,27 +73,28 @@ def save_item_bid_history(item_name, url):
 
     driver.close()
 
+def check_for_files(item_name):
+    files = os.listdir('data')
+    found_data = any([item_name in name for name in files])
+    return found_data
+
 
 if __name__ == '__main__':
     html = get_no_verify(BASE_URL)
-    soup = BeautifulSoup(html, 'lxml')
 
-    print(get_next_page_url(html))
+    for i in range(11):
+        soup = BeautifulSoup(html, 'lxml')
 
-    item_pages = get_item_pages(soup)
+        item_pages = get_item_pages(soup)
+        for page_name, page_url in item_pages:
+            page_name = clean_item_names(page_name)
+            if check_for_files(page_name):
+                continue
 
+            page_html = get_no_verify(page_url)
+            save_raw_page(page_name, page_html)
 
-
-
-
-    first_page = item_pages[0]
-
-    first_page_name = first_page[0]
-    first_page_html = get_no_verify(first_page[1])
-
-    save_raw_page(first_page_name, first_page_html)
-
-    bid_url = get_item_bid_url(first_page_html)
-    print(bid_url)
-
-    save_item_bid_history(first_page_name, bid_url)
+            bid_url = get_item_bid_url(page_html)
+            save_item_bid_history(page_name, bid_url)
+        
+        html = get_no_verify(get_next_page_url(html))
